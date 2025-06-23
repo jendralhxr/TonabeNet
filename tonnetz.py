@@ -77,3 +77,73 @@ nx.draw(G, pos=positions, with_labels=True, node_size=90,
 plt.title("Tonnetz (Hex Lattice, 7 Octaves)", fontsize=16)
 plt.axis('off')
 plt.show()
+
+
+
+#-----
+
+import networkx as nx
+import matplotlib.pyplot as plt
+
+MIN_NOTE = 36  # C2
+MAX_NOTE = 108  # C8
+
+# Convert MIDI to note string like "C4"
+def midi_to_pitch(m):
+    pitch_classes = ['C', 'C#', 'D', 'D#', 'E', 'F',
+                     'F#', 'G', 'G#', 'A', 'A#', 'B']
+    return f"{pitch_classes[m % 12]}{m // 12}"
+
+# Intervals in semitones
+INTERVALS = {
+    'M3': 4,   # horizontal
+    'P5': 7,   # down-right
+    'm3': 3,   # up-right
+}
+
+# Directions (q, r) on hex grid, with M3 horizontal
+DIRECTIONS = {
+    'M3': (1, 0),      # right
+    'P5': (0, 1),      # down-right
+    'm3': (1, -1),     # up-right
+}
+
+G = nx.Graph()
+positions = {}
+visited = set()
+coord_to_midi = {}
+
+# Start at C4 = MIDI 60
+queue = [(60, (0, 0))]
+
+while queue:
+    midi, (q, r) = queue.pop(0)
+    if not (MIN_NOTE <= midi <= MAX_NOTE) or midi in visited:
+        continue
+
+    visited.add(midi)
+    name = midi_to_pitch(midi)
+    G.add_node(name)
+    positions[name] = (q, -r)  # Flip y-axis to point up
+    coord_to_midi[(q, r)] = midi
+
+    for label, interval in INTERVALS.items():
+        next_midi = midi + interval
+        dq, dr = DIRECTIONS[label]
+        neighbor_coord = (q + dq, r + dr)
+        if MIN_NOTE <= next_midi <= MAX_NOTE:
+            next_name = midi_to_pitch(next_midi)
+            G.add_edge(name, next_name, interval=label)
+            queue.append((next_midi, neighbor_coord))
+
+# Edge colors
+color_map = {'P5': 'blue', 'M3': 'green', 'm3': 'red'}
+edge_colors = [color_map[G[u][v]['interval']] for u, v in G.edges]
+
+# Plot
+plt.figure(figsize=(14, 10))
+nx.draw(G, pos=positions, with_labels=True, node_color='lightyellow',
+        edge_color=edge_colors, node_size=300, font_size=8, width=1.5)
+plt.title("Tonnetz: Horizontal Major Thirds (C–E–G aligned)", fontsize=14)
+plt.axis('off')
+plt.show()
