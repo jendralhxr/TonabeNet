@@ -1,3 +1,7 @@
+# tonnetz lattice grid
+# Horizontal axis: perfect fifths (P5)
+# Diagonal axes: major thirds (M3) and minor thirds (m3)
+
 import networkx as nx
 import matplotlib.pyplot as plt
 
