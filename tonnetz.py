@@ -142,8 +142,11 @@ edge_colors = [color_map[G[u][v]['interval']] for u, v in G.edges]
 
 # Plot
 plt.figure(figsize=(14, 10))
-nx.draw(G, pos=positions, with_labels=True, node_color='lightyellow',
-        edge_color=edge_colors, node_size=300, font_size=8, width=1.5)
+plt.figure()
+
+nx.draw(G, pos=positions, with_labels=True, node_size=90,
+        node_color='lightyellow', font_size=8,
+        edge_color=edge_colors, width=1.8)
 plt.title("Tonnetz: Horizontal Major Thirds (C–E–G aligned)", fontsize=14)
 plt.axis('off')
 plt.show()
