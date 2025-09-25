@@ -1,13 +1,19 @@
 import networkx as nx
 import matplotlib.pyplot as plt
 
-MIN_NOTE = 36  # C2
+MIN_NOTE = 21  # C2
 MAX_NOTE = 108  # C8
 
 def midi_to_pitch(m):
     pitch_classes = ['C', 'C#', 'D', 'D#', 'E', 'F',
                      'F#', 'G', 'G#', 'A', 'A#', 'B']
     return f"{pitch_classes[m % 12]}{m // 12}"
+
+def midi_to_coord(midi):
+    # Express pitch as combination of 3 and 4 semitone steps (m3, M3, P5 lattice)
+    q = midi // 4    # rough: count of M3 steps
+    r = midi // 3    # rough: count of m3 steps
+    return (q, r)
 
 INTERVALS = {
     'M3': 4,   # horizontal
@@ -26,7 +32,13 @@ positions = {}
 coord_to_names = {}   # collect multiple note names per coordinate
 visited = set()
 
-queue = [(60, (0, 0))]  # Start at C4
+queue = [(21, (0, 0))]  # Start at C4
+
+# for midi in range(MIN_NOTE, MAX_NOTE+1):
+#     coord = midi_to_coord(midi)
+#     positions[coord] = (coord[0], -coord[1])
+#     name = midi_to_pitch(midi)
+#     coord_to_names.setdefault(coord, []).append(name)
 
 while queue:
     midi, (q, r) = queue.pop(0)
@@ -41,7 +53,8 @@ while queue:
         coord_to_names[(q, r)] = []
     coord_to_names[(q, r)].append(name)
 
-    positions[(q, r)] = (q, -r)
+    positions[(q, r)] = (q, r) # higher pitch up
+    # positions[(q, r)] = (q, -r) higher pitch down
 
     for label, interval in INTERVALS.items():
         next_midi = midi + interval
@@ -74,7 +87,7 @@ p5_edges = [(u, v) for u, v, d in G.edges(data=True) if d['interval'] == 'P5']
 m3_edges = [(u, v) for u, v, d in G.edges(data=True) if d['interval'] == 'm3']
 M3_edges = [(u, v) for u, v, d in G.edges(data=True) if d['interval'] == 'M3']
 
-plt.figure(figsize=(14, 10))
+plt.figure(figsize=(10, 16))
 
 # Draw nodes
 nx.draw_networkx_nodes(G, pos=positions, node_size=1400, node_color='yellow')
@@ -105,7 +118,7 @@ nx.draw_networkx_edges(
 )
 
 # let networkx build the legend box
-plt.legend(loc="upper right")
+plt.legend(loc="lower left")
 
 plt.title("Tonnetz (Merged Enharmonic/Overlapping Nodes)", fontsize=14)
 plt.axis('off')
