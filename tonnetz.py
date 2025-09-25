@@ -1,120 +1,32 @@
-# tonnetz lattice grid
-# Horizontal axis: perfect fifths (P5)
-# Diagonal axes: major thirds (M3) and minor thirds (m3)
-
-import networkx as nx
-import matplotlib.pyplot as plt
-
-# MIDI notes for 7 octaves (e.g. MIDI 36 = C2, up to MIDI 108 = C8)
-MIN_NOTE = 36
-MAX_NOTE = 108
-
-# Map MIDI numbers to pitch names with octaves
-def midi_to_pitch(m):
-    pitch_classes = ['C', 'C#', 'D', 'D#', 'E', 'F',
-                     'F#', 'G', 'G#', 'A', 'A#', 'B']
-    return f"{pitch_classes[m % 12]}{m // 12}"
-
-# Intervals in semitones
-INTERVALS = {
-    'P5': 7,   # perfect fifth
-    'M3': 4,   # major third
-    'm3': 3,   # minor third
-}
-
-# Directions for hex layout
-# (q, r) coordinates like axial hex grid
-DIRECTIONS = {
-    'P5': (1, 0),
-    'M3': (0, 1),
-    'm3': (1, -1),
-}
-
-G = nx.Graph()
-positions = {}  # hex layout positions
-midi_to_coord = {}  # to prevent duplicates
-
-# Start at center with C4 (MIDI 60)
-center = (0, 0)
-start_note = 60
-queue = [(start_note, center)]
-visited = set()
-
-while queue:
-    midi, (q, r) = queue.pop(0)
-    if midi < MIN_NOTE or midi > MAX_NOTE:
-        continue
-    if midi in visited:
-        continue
-
-    visited.add(midi)
-    name = midi_to_pitch(midi)
-    G.add_node(name)
-    positions[name] = (q, -r)  # Flip y to make plot upward
-
-    midi_to_coord[midi] = (q, r)
-
-    for label, interval in INTERVALS.items():
-        neighbor_midi = midi + interval
-        dq, dr = DIRECTIONS[label]
-        neighbor_coord = (q + dq, r + dr)
-        if neighbor_midi not in visited:
-            queue.append((neighbor_midi, neighbor_coord))
-        if MIN_NOTE <= neighbor_midi <= MAX_NOTE:
-            neighbor_name = midi_to_pitch(neighbor_midi)
-            G.add_edge(name, neighbor_name, interval=label)
-
-# Draw the graph
-color_map = {'P5': 'blue', 'M3': 'green', 'm3': 'red'}
-edge_colors = [color_map[G[u][v]['interval']] for u, v in G.edges]
-
-plt.figure(figsize=(14, 12))
-plt.figure()
-nx.draw(G, pos=positions, with_labels=True, node_size=90,
-        node_color='lightyellow', font_size=8,
-        edge_color=edge_colors, width=1.8)
-
-plt.title("Tonnetz (Hex Lattice, 7 Octaves)", fontsize=16)
-plt.axis('off')
-plt.show()
-
-
-
-#-----
-
 import networkx as nx
 import matplotlib.pyplot as plt
 
 MIN_NOTE = 36  # C2
 MAX_NOTE = 108  # C8
 
-# Convert MIDI to note string like "C4"
 def midi_to_pitch(m):
     pitch_classes = ['C', 'C#', 'D', 'D#', 'E', 'F',
                      'F#', 'G', 'G#', 'A', 'A#', 'B']
     return f"{pitch_classes[m % 12]}{m // 12}"
 
-# Intervals in semitones
 INTERVALS = {
     'M3': 4,   # horizontal
     'P5': 7,   # down-right
     'm3': 3,   # up-right
 }
 
-# Directions (q, r) on hex grid, with M3 horizontal
 DIRECTIONS = {
-    'M3': (1, 0),      # right
-    'P5': (0, 1),      # down-right
-    'm3': (1, -1),     # up-right
+    'M3': (1, 0.5),   # right
+    'P5': (0, 1),     # down-right
+    'm3': (1, -0.5),  # up-right
 }
 
 G = nx.Graph()
 positions = {}
+coord_to_names = {}   # collect multiple note names per coordinate
 visited = set()
-coord_to_midi = {}
 
-# Start at C4 = MIDI 60
-queue = [(60, (0, 0))]
+queue = [(60, (0, 0))]  # Start at C4
 
 while queue:
     midi, (q, r) = queue.pop(0)
@@ -123,30 +35,59 @@ while queue:
 
     visited.add(midi)
     name = midi_to_pitch(midi)
-    G.add_node(name)
-    positions[name] = (q, -r)  # Flip y-axis to point up
-    coord_to_midi[(q, r)] = midi
+
+    # merge nodes by coordinate
+    if (q, r) not in coord_to_names:
+        coord_to_names[(q, r)] = []
+    coord_to_names[(q, r)].append(name)
+
+    positions[(q, r)] = (q, -r)
 
     for label, interval in INTERVALS.items():
         next_midi = midi + interval
         dq, dr = DIRECTIONS[label]
         neighbor_coord = (q + dq, r + dr)
         if MIN_NOTE <= next_midi <= MAX_NOTE:
-            next_name = midi_to_pitch(next_midi)
-            G.add_edge(name, next_name, interval=label)
             queue.append((next_midi, neighbor_coord))
 
-# Edge colors
-color_map = {'P5': 'blue', 'M3': 'green', 'm3': 'red'}
-edge_colors = [color_map[G[u][v]['interval']] for u, v in G.edges]
+# Build graph with merged nodes
+coord_to_label = {coord: "\n".join(names) for coord, names in coord_to_names.items()}
 
-# Plot
+for coord, label in coord_to_label.items():
+    G.add_node(label)
+    positions[label] = positions[coord]
+
+# Add edges (check merged labels!)
+for coord, names in coord_to_names.items():
+    label = coord_to_label[coord]
+    midi = names[0]  # representative
+    for intvl, semitones in INTERVALS.items():
+        dq, dr = DIRECTIONS[intvl]
+        neighbor_coord = (coord[0] + dq, coord[1] + dr)
+        if neighbor_coord in coord_to_label:
+            neighbor_label = coord_to_label[neighbor_coord]
+            if not G.has_edge(label, neighbor_label):
+                G.add_edge(label, neighbor_label, interval=intvl)
+
+# Split edges by type
+p5_edges = [(u, v) for u, v, d in G.edges(data=True) if d['interval'] == 'P5']
+m3_edges = [(u, v) for u, v, d in G.edges(data=True) if d['interval'] == 'm3']
+M3_edges = [(u, v) for u, v, d in G.edges(data=True) if d['interval'] == 'M3']
+
 plt.figure(figsize=(14, 10))
-plt.figure()
 
-nx.draw(G, pos=positions, with_labels=True, node_size=90,
-        node_color='lightyellow', font_size=8,
-        edge_color=edge_colors, width=1.8)
-plt.title("Tonnetz: Horizontal Major Thirds (C–E–G aligned)", fontsize=14)
+# Draw nodes
+nx.draw_networkx_nodes(G, pos=positions, node_size=1400, node_color='yellow')
+nx.draw_networkx_labels(G, pos=positions, font_size=12)
+
+# Draw edges with styles
+nx.draw_networkx_edges(G, pos=positions, edgelist=p5_edges,
+                       edge_color='blue', width=4, style='solid')
+nx.draw_networkx_edges(G, pos=positions, edgelist=M3_edges,
+                       edge_color='green', width=3, style='dashed')
+nx.draw_networkx_edges(G, pos=positions, edgelist=m3_edges,
+                       edge_color='red', width=2, style='dashed')
+
+plt.title("Tonnetz (Merged Enharmonic/Overlapping Nodes)", fontsize=14)
 plt.axis('off')
 plt.show()
