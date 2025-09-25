@@ -88,6 +88,25 @@ nx.draw_networkx_edges(G, pos=positions, edgelist=M3_edges,
 nx.draw_networkx_edges(G, pos=positions, edgelist=m3_edges,
                        edge_color='red', width=2, style='dashed')
 
+nx.draw_networkx_edges(
+    G, pos=positions, edgelist=p5_edges,
+    edge_color='blue', width=4, style='solid',
+    label="Perfect 5th"
+)
+nx.draw_networkx_edges(
+    G, pos=positions, edgelist=M3_edges,
+    edge_color='green', width=3, style='dashed',
+    label="Major 3rd"
+)
+nx.draw_networkx_edges(
+    G, pos=positions, edgelist=m3_edges,
+    edge_color='red', width=2, style='dashed',
+    label="Minor 3rd"
+)
+
+# let networkx build the legend box
+plt.legend(loc="upper right")
+
 plt.title("Tonnetz (Merged Enharmonic/Overlapping Nodes)", fontsize=14)
 plt.axis('off')
 plt.show()
