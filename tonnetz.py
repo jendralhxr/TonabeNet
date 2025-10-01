@@ -87,39 +87,40 @@ p5_edges = [(u, v) for u, v, d in G.edges(data=True) if d['interval'] == 'P5']
 m3_edges = [(u, v) for u, v, d in G.edges(data=True) if d['interval'] == 'm3']
 M3_edges = [(u, v) for u, v, d in G.edges(data=True) if d['interval'] == 'M3']
 
+import matplotlib.cm as cm
+import matplotlib.colors as mcolors
+
+# Assign values to nodes (number of note names inside each merged node)
+node_values = {label: 0 for label in G.nodes()}
+
+# Normalize values for colormap
+max_val = max(node_values.values())
+norm = mcolors.Normalize(vmin=0, vmax=255)
+cmap = cm.get_cmap('rainbow')
+
+# Map node values to colors
+node_colors = [cmap(norm(node_values[n])) for n in G.nodes()]
+
 plt.figure(figsize=(10, 16))
 
-# Draw nodes
-nx.draw_networkx_nodes(G, pos=positions, node_size=1400, node_color='yellow')
+# Draw nodes with rainbow coloring
+nx.draw_networkx_nodes(G, pos=positions, node_size=1400, node_color=node_colors)
 nx.draw_networkx_labels(G, pos=positions, font_size=12)
 
 # Draw edges with styles
 nx.draw_networkx_edges(G, pos=positions, edgelist=p5_edges,
-                       edge_color='blue', width=4, style='solid')
+                       edge_color='blue', width=4, style='solid', label="Perfect 5th")
 nx.draw_networkx_edges(G, pos=positions, edgelist=M3_edges,
-                       edge_color='green', width=3, style='dashed')
+                       edge_color='green', width=3, style='dashed', label="Major 3rd")
 nx.draw_networkx_edges(G, pos=positions, edgelist=m3_edges,
-                       edge_color='red', width=2, style='dashed')
+                       edge_color='red', width=2, style='dashed', label="Minor 3rd")
 
-nx.draw_networkx_edges(
-    G, pos=positions, edgelist=p5_edges,
-    edge_color='blue', width=4, style='solid',
-    label="Perfect 5th"
-)
-nx.draw_networkx_edges(
-    G, pos=positions, edgelist=M3_edges,
-    edge_color='green', width=3, style='dashed',
-    label="Major 3rd"
-)
-nx.draw_networkx_edges(
-    G, pos=positions, edgelist=m3_edges,
-    edge_color='red', width=2, style='dashed',
-    label="Minor 3rd"
-)
+# Add colorbar to indicate "number of merged notes"
+sm = cm.ScalarMappable(cmap=cmap, norm=norm)
+sm.set_array([])
+plt.colorbar(sm, label="Number of Note Names")
 
-# let networkx build the legend box
 plt.legend(loc="lower left")
-
 plt.title("Tonnetz (Merged Enharmonic/Overlapping Nodes)", fontsize=14)
 plt.axis('off')
 plt.show()
