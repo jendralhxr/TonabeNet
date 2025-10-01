@@ -5,7 +5,7 @@ from PySide6.QtGui import QPainter, QColor, QPen, QBrush, QFont
 from PySide6.QtCore import Qt
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
-from PySide6.QtCore import QRectF, Qt
+from PySide6.QtCore import QRectF
 
 # ----------------------------
 # Tonnetz Graph Construction
