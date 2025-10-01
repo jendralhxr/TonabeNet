@@ -4,11 +4,9 @@ import sys
 import networkx as nx
 from PySide6.QtWidgets import QApplication, QWidget
 from PySide6.QtGui import QPainter, QColor, QPen, QBrush, QFont
-from PySide6.QtCore import Qt
-import matplotlib
+from PySide6.QtCore import Qt, QRectF
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
-from PySide6.QtCore import QRectF, Qt
 
 # ----------------------------
 # Tonnetz Graph Construction
@@ -16,6 +14,10 @@ from PySide6.QtCore import QRectF, Qt
 
 MIN_NOTE = 21  # C2
 MAX_NOTE = 108  # C8
+
+FADE_IN_CHORD= 20
+FADE_IN_MELODY= 30
+FADE_OUT= 10
 
 def midi_to_pitch(m):
     pitch_classes = ['C', 'C#', 'D', 'D#', 'E', 'F',
@@ -80,6 +82,8 @@ for coord, names in coord_to_names.items():
 
 # Initialize node values (all start at 0)
 node_values = {label: 0 for label in G.nodes()}
+for n in G.nodes:
+        G.nodes[n]["presence"] = 0.0
 
 ### the stream routine
 
@@ -154,12 +158,6 @@ def callback(outdata, frames, time_info, status):
 frame = 0
 
 
-import sys
-import numpy as np
-from PySide6.QtWidgets import QApplication, QWidget
-from PySide6.QtGui import QPainter, QColor, QPen, QBrush, QFont
-from PySide6.QtCore import Qt, QTimer
-
 class TonnetzWidget(QWidget):
     def __init__(self, G, positions, node_values, parent=None):
         super().__init__(parent)
@@ -179,7 +177,7 @@ class TonnetzWidget(QWidget):
         painter.setRenderHint(QPainter.Antialiasing)
 
         scale = 60
-        offset_x, offset_y = 60,750
+        offset_x, offset_y = 60,760
 
         # Draw edges
         for u, v, d in self.G.edges(data=True):
@@ -189,7 +187,7 @@ class TonnetzWidget(QWidget):
             x2, y2 = x2 * scale + offset_x, -y2 * scale + offset_y
 
             if d["interval"] == "P5":
-                pen = QPen(QColor("blue"), 3, Qt.SolidLine)
+                pen = QPen(QColor("blue"), 5, Qt.SolidLine)
             elif d["interval"] == "M3":
                 pen = QPen(QColor("green"), 3, Qt.DashLine)
             else:  # m3
