@@ -1,10 +1,13 @@
 import librosa
 import numpy as np
 import sounddevice as sd
-import time
+
+phi= 1.618033988749
+FINGERS= 5
+CHORD_OCTAVE= 3 # just safe assumption
 
 # --- Load audio ---
-filename = "test.mp3"
+filename = "/shm/fernzilla - golden.mp3"
 y, sr = librosa.load(filename, sr=None)
 
 # Frame settings
@@ -18,7 +21,7 @@ chroma = librosa.feature.chroma_cqt(y=y, sr=sr, hop_length=hop_length)
 note_names = ['C', 'C#', 'D', 'D#', 'E', 'F',
               'F#', 'G', 'G#', 'A', 'A#', 'B']
 
-print(f"timestamp, melody, chord")
+print("timestamp, melody, chord")
 
 # --- Playback and analysis ---
 def callback(outdata, frames, time_info, status):
@@ -47,19 +50,20 @@ def callback(outdata, frames, time_info, status):
 
     # --- Chord root guess ---
     chord_vector = chroma[:, frame]
-    root = note_names[np.argmax(chord_vector)]
-
-    chord_vector = chroma[:, frame]
-    topN = 5 # five fingers
+    topN = FINGERS # five fingers
     top_idx = np.argsort(chord_vector)[::-1][:topN]  # sort descending
     top_notes = [(note_names[i], float(chord_vector[i])) for i in top_idx]
+
+    # amplitude filter: keep only amplitudes >= ~10% of the max
+    threshold = float(np.max(chord_vector)) / (phi**FINGERS)
+    top_notes = [(n, v) for n, v in top_notes if v >= threshold]
 
     # Print in CSV-like format
     print(f"{frame*frame_duration:5.2f},{note:3}," +
           " ".join([f"{n}:{v:.2f}" for n, v in top_notes]))
+    
+    frame = frame +1 
 
-
-    frame += 1
 
 # Initialize frame index
 frame = 0
