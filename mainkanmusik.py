@@ -5,6 +5,7 @@ import networkx as nx
 from PySide6.QtWidgets import QApplication, QWidget
 from PySide6.QtGui import QPainter, QColor, QPen, QBrush, QFont
 from PySide6.QtCore import Qt, QRectF
+from PySide6.QtCore import QObject, Signal
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 
@@ -16,8 +17,8 @@ MIN_NOTE = 21  # C2
 MAX_NOTE = 108  # C8
 
 FADE_IN_CHORD= 20
-FADE_IN_MELODY= 30
-FADE_OUT= 10
+FADE_IN_MELODY= 10
+FADE_OUT= 5
 
 def midi_to_pitch(m):
     pitch_classes = ['C', 'C#', 'D', 'D#', 'E', 'F',
@@ -65,6 +66,13 @@ while queue:
 
 # merge node names by coordinate
 coord_to_label = {coord: "\n".join(names) for coord, names in coord_to_names.items()}
+
+note_to_node = {}
+for coord, names in coord_to_names.items():
+    merged_label = coord_to_label[coord]  # e.g. "F#3\nG#4"
+    for name in names:                    # ["F#3", "G#4"]
+        note_to_node[name] = merged_label
+
 
 for coord, label in coord_to_label.items():
     G.add_node(label)
@@ -115,8 +123,8 @@ print("timestamp, melody, chord")
 # --- Playback and analysis ---
 def callback(outdata, frames, time_info, status):
     global frame
-    if status:
-        print(status)
+    # if status:
+    #     print(status)
 
     # Send chunk to sound output
     start = frame * hop_length
@@ -146,7 +154,24 @@ def callback(outdata, frames, time_info, status):
     # amplitude filter: keep only amplitudes >= ~10% of the max
     threshold = float(np.max(chord_vector)) / (phi**FINGERS)
     top_notes = [(n, v) for n, v in top_notes if v >= threshold]
+    
+    # fadeout
+    for n in G.nodes():
+        # print(f"wasme {n}")
+        G.nodes[n]['presence'] -= FADE_OUT
+        if G.nodes[n]['presence'] < 0:
+            G.nodes[n]['presence']= 0
+        
+    # recently activated chord notes
+    for n, v in top_notes:
+        chord_note= n+str(CHORD_OCTAVE)
+        label= note_to_node[chord_note]
+        G.nodes[label]["presence"] += FADE_IN_CHORD
+        if G.nodes[label]["presence"]>255:
+            G.nodes[label]["presence"]= 255
 
+    notifier.updated.emit()
+    
     # Print in CSV-like format
     print(f"{frame*frame_duration:5.2f},{note:3}," +
           " ".join([f"{n}:{v:.2f}" for n, v in top_notes]))
@@ -159,16 +184,13 @@ frame = 0
 
 
 class TonnetzWidget(QWidget):
-    def __init__(self, G, positions, node_values, parent=None):
+    def __init__(self, G, positions, parent=None):
         super().__init__(parent)
         self.G = G
         self.positions = positions
-        self.node_values = node_values
-
+        
         self.cmap = cm.get_cmap("rainbow")
-        max_val = max(node_values.values()) if node_values else 1
-        self.norm = mcolors.Normalize(vmin=0, vmax=max_val)
-
+        
         self.resize(360, 900)
         self.setWindowTitle("Tonnetz Widget (63 nodes)")
 
@@ -201,11 +223,12 @@ class TonnetzWidget(QWidget):
         font = QFont("Monospace", 10)
         painter.setFont(font)
 
-        for n in self.G.nodes():
+        for n in G.nodes():
             x, y = self.positions[n]
             x, y = x * scale + offset_x, -y * scale + offset_y
 
-            val = self.node_values.get(n, 0)
+            val = self.G.nodes[n]["presence"]
+            self.norm = mcolors.Normalize(vmin=0, vmax=255)
             rgba = self.cmap(self.norm(val))
             color = QColor.fromRgbF(*rgba)
 
@@ -221,12 +244,18 @@ class TonnetzWidget(QWidget):
             painter.setPen(QPen(QColor("white")))
             painter.drawText(rect, Qt.AlignCenter | Qt.TextWordWrap, n)
 
+class AudioNotifier(QObject):
+    updated = Signal()
+
             
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    w = TonnetzWidget(G, positions, node_values)
+    w = TonnetzWidget(G, positions)
     w.show()
+
+    notifier = AudioNotifier()
+    notifier.updated.connect(w.update)
 
     # Start audio stream
     stream = sd.OutputStream(channels=1, samplerate=sr, callback=callback, blocksize=hop_length)
